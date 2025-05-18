@@ -1,9 +1,11 @@
 from django.shortcuts import render
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
-from .models import Cart, CartItem, Order, OrderItem
-from .serializers import CartSerializer, CartItemSerializer, OrderSerializer, OrderItemSerializer
 from rest_framework.decorators import action
+from products.models import Cart, CartItem
+from .models import Order, OrderItem
+from products.serializers import CartSerializer, CartItemSerializer
+from .serializers import OrderSerializer, OrderItemSerializer
 
 # Create your views here.
 
@@ -28,9 +30,15 @@ class CartItemViewSet(viewsets.ModelViewSet):
         return CartItem.objects.filter(cart__user=self.request.user)
 
 class OrderViewSet(viewsets.ModelViewSet):
-    queryset = Order.objects.all()
     serializer_class = OrderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Order.objects.filter(user=self.request.user)
 
 class OrderItemViewSet(viewsets.ModelViewSet):
-    queryset = OrderItem.objects.all()
     serializer_class = OrderItemSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return OrderItem.objects.filter(order__user=self.request.user)

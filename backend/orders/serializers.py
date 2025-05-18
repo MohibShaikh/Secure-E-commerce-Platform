@@ -1,33 +1,26 @@
 from rest_framework import serializers
-from .models import Cart, CartItem, Order, OrderItem
-from products.serializers import ProductSerializer
-from products.models import Product
-
-class CartItemSerializer(serializers.ModelSerializer):
-    product = ProductSerializer(read_only=True)
-    product_id = serializers.PrimaryKeyRelatedField(
-        queryset=Product.objects.all(),
-        source='product',
-        write_only=True
-    )
-    class Meta:
-        model = CartItem
-        fields = ['id', 'product', 'product_id', 'quantity', 'total_price']
-
-class CartSerializer(serializers.ModelSerializer):
-    items = CartItemSerializer(many=True, read_only=True)
-    class Meta:
-        model = Cart
-        fields = ['id', 'user', 'items', 'total_price']
-
-class OrderItemSerializer(serializers.ModelSerializer):
-    product = ProductSerializer(read_only=True)
-    class Meta:
-        model = OrderItem
-        fields = ['id', 'product', 'quantity', 'price', 'total_price']
+from products.models import Cart, CartItem
+from products.serializers import CartSerializer, CartItemSerializer
+from .models import Order, OrderItem
 
 class OrderSerializer(serializers.ModelSerializer):
-    items = OrderItemSerializer(many=True, read_only=True)
+    items = serializers.SerializerMethodField()
+    total_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+
     class Meta:
         model = Order
-        fields = ['id', 'user', 'status', 'total_price', 'shipping_address', 'created_at', 'updated_at', 'items'] 
+        fields = ['id', 'user', 'status', 'total_amount', 'shipping_address', 'items', 'created_at', 'updated_at']
+        read_only_fields = ['user', 'total_amount']
+
+    def get_items(self, obj):
+        items = OrderItem.objects.filter(order=obj)
+        return OrderItemSerializer(items, many=True).data
+
+class OrderItemSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = OrderItem
+        fields = ['id', 'order', 'product', 'product_name', 'quantity', 'price', 'total_price']
+        read_only_fields = ['price'] 
