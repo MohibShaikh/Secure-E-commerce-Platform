@@ -96,7 +96,7 @@ WSGI_APPLICATION = "ecom_backend.wsgi.application"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
-    "default": env.db('DATABASE_URL', default='sqlite:///db.sqlite3')
+    "default": env.db('sqlite:///db.sqlite3')
 }
 
 
