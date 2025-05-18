@@ -114,8 +114,9 @@ class CartViewSet(viewsets.ModelViewSet):
             # Create an order from the cart
             order = Order.objects.create(
                 user=request.user,
-                total_price=cart.total_price,
-                status='pending'
+                total_amount=cart.total_price,
+                status='pending',
+                shipping_address=''  # This will be updated during payment
             )
             
             # Create order items from cart items

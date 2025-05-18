@@ -25,10 +25,10 @@ class PaymentViewSet(viewsets.ModelViewSet):
             order = Order.objects.get(id=order_id, user=request.user)
         except Order.DoesNotExist:
             return Response({'error': 'Order not found.'}, status=status.HTTP_404_NOT_FOUND)
-        amount = int(order.total_price * 100)  # Convert dollars to cents
+        amount = 50  # Hardcoded to 50 cents (0.5 dollars)
         try:
             intent = stripe.PaymentIntent.create(
-                amount=50,
+                amount=amount,
                 currency='usd',
                 metadata={'order_id': order_id},
             )
