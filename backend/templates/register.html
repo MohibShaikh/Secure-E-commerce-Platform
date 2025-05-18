@@ -70,6 +70,8 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
         password2: document.getElementById('password2').value
     };
 
+    console.log('Form data:', formData);
+
     if (formData.password !== formData.password2) {
         errorMessage.textContent = 'Passwords do not match';
         errorMessage.style.display = 'block';
@@ -77,9 +79,11 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     }
 
     const csrftoken = getCookie('csrftoken');
+    console.log('CSRF Token:', csrftoken);
 
     try {
-        const response = await fetch('/api/users/register/', {
+        console.log('Sending request to:', '/api/users/api/register/');
+        const response = await fetch('/api/users/api/register/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -88,7 +92,9 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
             body: JSON.stringify(formData)
         });
 
+        console.log('Response status:', response.status);
         const data = await response.json();
+        console.log('Response data:', data);
 
         if (response.ok) {
             // Store tokens
@@ -102,6 +108,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
             errorMessage.style.display = 'block';
         }
     } catch (error) {
+        console.error('Error:', error);
         errorMessage.textContent = 'An error occurred. Please try again.';
         errorMessage.style.display = 'block';
     }
