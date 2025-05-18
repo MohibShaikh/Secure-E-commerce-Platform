@@ -1,4 +1,0 @@
-#!/bin/bash
-python manage.py migrate
-python manage.py add_sample_products
-gunicorn ecom_backend.wsgi:application -c gunicorn_config.py 
