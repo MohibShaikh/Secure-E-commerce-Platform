@@ -4,39 +4,31 @@
 
 {% block content %}
 <div class="card">
-    <div class="card-header">
-        <h1>Create an Account</h1>
-        <p>Join our e-commerce platform today</p>
-    </div>
-
-    <form id="registerForm" method="post">
+    <h1>Create an Account</h1>
+    
+    <form id="registerForm">
         {% csrf_token %}
         <div class="form-group">
-            <label for="username" class="form-label">Username</label>
-            <input type="text" id="username" name="username" class="form-input" required>
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" required>
         </div>
-
+        
         <div class="form-group">
-            <label for="email" class="form-label">Email</label>
-            <input type="email" id="email" name="email" class="form-input" required>
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required>
         </div>
-
+        
         <div class="form-group">
-            <label for="password" class="form-label">Password</label>
-            <input type="password" id="password" name="password" class="form-input" required>
-        </div>
-
-        <div class="form-group">
-            <label for="password2" class="form-label">Confirm Password</label>
-            <input type="password" id="password2" name="password2" class="form-input" required>
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required>
         </div>
 
         <div id="error-message" class="alert alert-error" style="display: none;"></div>
-
+        
         <button type="submit" class="btn btn-primary">Register</button>
-
-        <p style="text-align: center; margin-top: 1rem;">
-            Already have an account? <a href="{% url 'login_page' %}" class="link">Login</a>
+        
+        <p class="text-center">
+            Already have an account? <a href="/api/users/login/">Login here</a>
         </p>
     </form>
 </div>
@@ -57,7 +49,7 @@ function getCookie(name) {
     return cookieValue;
 }
 
-document.getElementById('registerForm').addEventListener('submit', async (e) => {
+document.getElementById('registerForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
     const errorMessage = document.getElementById('error-message');
@@ -66,49 +58,32 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     const formData = {
         username: document.getElementById('username').value,
         email: document.getElementById('email').value,
-        password: document.getElementById('password').value,
-        password2: document.getElementById('password2').value
+        password: document.getElementById('password').value
     };
 
-    console.log('Form data:', formData);
-
-    if (formData.password !== formData.password2) {
-        errorMessage.textContent = 'Passwords do not match';
-        errorMessage.style.display = 'block';
-        return;
-    }
-
-    const csrftoken = getCookie('csrftoken');
-    console.log('CSRF Token:', csrftoken);
-
     try {
-        console.log('Sending request to:', '/api/users/api/register/');
         const response = await fetch('/api/users/api/register/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': csrftoken
+                'X-CSRFToken': getCookie('csrftoken')
             },
             body: JSON.stringify(formData)
         });
 
-        console.log('Response status:', response.status);
         const data = await response.json();
-        console.log('Response data:', data);
 
         if (response.ok) {
             // Store tokens
             localStorage.setItem('access_token', data.access);
             localStorage.setItem('refresh_token', data.refresh);
-            
-            // Redirect to profile page
+            // Redirect to profile
             window.location.href = '/api/users/profile/';
         } else {
-            errorMessage.textContent = data.detail || 'Registration failed';
+            errorMessage.textContent = data.detail || 'Registration failed. Please try again.';
             errorMessage.style.display = 'block';
         }
     } catch (error) {
-        console.error('Error:', error);
         errorMessage.textContent = 'An error occurred. Please try again.';
         errorMessage.style.display = 'block';
     }

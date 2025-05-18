@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Profile - E-Commerce Platform{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>Edit Profile</h1>
+    
+    <form id="editProfileForm">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="phone_number">Phone Number</label>
+            <input type="tel" id="phone_number" name="phone_number">
+        </div>
+        
+        <div class="form-group">
+            <label for="address">Address</label>
+            <textarea id="address" name="address" rows="3"></textarea>
+        </div>
+
+        <div id="error-message" class="alert alert-error" style="display: none;"></div>
+        
+        <div style="display: flex; gap: 1rem;">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <button type="button" onclick="window.location.href='/api/users/profile/'" class="btn btn-secondary">Cancel</button>
+        </div>
+    </form>
+</div>
+
+<script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+async function loadProfile() {
+    const errorMessage = document.getElementById('error-message');
+    const accessToken = localStorage.getItem('access_token');
+    
+    if (!accessToken) {
+        console.log('No access token found, redirecting to login');
+        window.location.href = '/api/users/login/';
+        return;
+    }
+
+    try {
+        console.log('Fetching profile with token:', accessToken);
+        const response = await fetch('/api/users/api/profile/', {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
+
+        console.log('Profile response status:', response.status);
+
+        if (response.status === 401) {
+            console.log('Token expired, attempting refresh');
+            // Token expired, try to refresh
+            const refreshToken = localStorage.getItem('refresh_token');
+            if (refreshToken) {
+                const refreshResponse = await fetch('/api/token/refresh/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ refresh: refreshToken })
+                });
+
+                console.log('Refresh response status:', refreshResponse.status);
+
+                if (refreshResponse.ok) {
+                    const data = await refreshResponse.json();
+                    localStorage.setItem('access_token', data.access);
+                    // Retry the profile request
+                    return loadProfile();
+                }
+            }
+            // If refresh failed, redirect to login
+            console.log('Refresh failed, redirecting to login');
+            window.location.href = '/api/users/login/';
+            return;
+        }
+
+        const data = await response.json();
+        console.log('Profile data:', data);
+        
+        // Fill form with current data
+        document.getElementById('email').value = data.email;
+        document.getElementById('phone_number').value = data.phone_number || '';
+        document.getElementById('address').value = data.address || '';
+    } catch (error) {
+        console.error('Profile load error:', error);
+        errorMessage.textContent = 'Failed to load profile. Please try again.';
+        errorMessage.style.display = 'block';
+    }
+}
+
+document.getElementById('editProfileForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const errorMessage = document.getElementById('error-message');
+    const accessToken = localStorage.getItem('access_token');
+    
+    if (!accessToken) {
+        console.log('No access token found, redirecting to login');
+        window.location.href = '/api/users/login/';
+        return;
+    }
+
+    const formData = {
+        email: document.getElementById('email').value,
+        phone_number: document.getElementById('phone_number').value,
+        address: document.getElementById('address').value
+    };
+
+    try {
+        console.log('Submitting profile update with token:', accessToken);
+        const response = await fetch('/api/users/api/profile/', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`,
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(formData)
+        });
+
+        console.log('Update response status:', response.status);
+
+        if (response.status === 401) {
+            console.log('Token expired, attempting refresh');
+            // Token expired, try to refresh
+            const refreshToken = localStorage.getItem('refresh_token');
+            if (refreshToken) {
+                const refreshResponse = await fetch('/api/token/refresh/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ refresh: refreshToken })
+                });
+
+                console.log('Refresh response status:', refreshResponse.status);
+
+                if (refreshResponse.ok) {
+                    const data = await refreshResponse.json();
+                    localStorage.setItem('access_token', data.access);
+                    // Retry the update
+                    return this.dispatchEvent(new Event('submit'));
+                }
+            }
+            // If refresh failed, redirect to login
+            console.log('Refresh failed, redirecting to login');
+            window.location.href = '/api/users/login/';
+            return;
+        }
+
+        if (response.ok) {
+            console.log('Profile updated successfully');
+            window.location.href = '/api/users/profile/';
+        } else {
+            const data = await response.json();
+            console.error('Update failed:', data);
+            errorMessage.textContent = data.detail || 'Failed to update profile. Please try again.';
+            errorMessage.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Update error:', error);
+        errorMessage.textContent = 'Failed to update profile. Please try again.';
+        errorMessage.style.display = 'block';
+    }
+});
+
+// Load profile when page loads
+loadProfile();
+</script>
+{% endblock %} 

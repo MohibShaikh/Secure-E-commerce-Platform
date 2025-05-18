@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block title %}Payment - E-Commerce Platform{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-4xl py-8">
+    <div class="bg-white shadow-lg rounded-lg p-6">
+        <h1 class="text-3xl font-bold mb-8">Complete Your Payment</h1>
+        <div id="payment-status" class="my-4 text-center"></div>
+        <div id="payment-form" class="hidden">
+            <div id="card-element" class="mb-4 p-4 border rounded-lg"></div>
+            <div id="card-errors" class="text-red-500 mb-4" role="alert"></div>
+            <button id="submit-payment" class="w-full bg-gradient-to-r from-green-400 to-blue-500 hover:from-green-500 hover:to-blue-600 text-white font-bold py-3 px-6 rounded shadow-lg">
+                Pay Now
+            </button>
+        </div>
+    </div>
+</div>
+
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+let stripe;
+let elements;
+let orderId;
+
+async function initializePayment() {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        window.location.href = '/login/';
+        return;
+    }
+
+    try {
+        // Get the order ID from the URL
+        const urlParams = new URLSearchParams(window.location.search);
+        orderId = urlParams.get('order_id');
+        
+        if (!orderId) {
+            throw new Error('No order ID provided');
+        }
+
+        // Get the payment intent from the server
+        const response = await fetch(`/api/payments/create_intent/${orderId}/`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to initialize payment');
+        }
+
+        const data = await response.json();
+        
+        // Initialize Stripe
+        stripe = Stripe(data.publishable_key);
+        elements = stripe.elements();
+        
+        // Create card element
+        const card = elements.create('card');
+        card.mount('#card-element');
+
+        // Handle real-time validation errors
+        card.addEventListener('change', function(event) {
+            const displayError = document.getElementById('card-errors');
+            if (event.error) {
+                displayError.textContent = event.error.message;
+            } else {
+                displayError.textContent = '';
+            }
+        });
+
+        // Handle form submission
+        const form = document.getElementById('payment-form');
+        form.classList.remove('hidden');
+        document.getElementById('payment-status').classList.add('hidden');
+
+        const submitButton = document.getElementById('submit-payment');
+        submitButton.addEventListener('click', async function(event) {
+            event.preventDefault();
+            submitButton.disabled = true;
+            submitButton.textContent = 'Processing...';
+
+            try {
+                const { paymentIntent, error } = await stripe.confirmCardPayment(data.client_secret, {
+                    payment_method: {
+                        card: card,
+                        billing_details: {
+                            // You can add billing details here if needed
+                        }
+                    }
+                });
+
+                if (error) {
+                    throw new Error(error.message);
+                }
+
+                if (paymentIntent.status === 'succeeded') {
+                    // Payment successful
+                    await fetch(`/api/payments/confirm/${orderId}/`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+
+                    document.getElementById('payment-status').innerHTML =
+                        `<span class="text-green-600 font-bold">Payment successful! Thank you for your order.</span>`;
+                    setTimeout(() => window.location.href = '/orders/', 2000);
+                }
+            } catch (error) {
+                const errorElement = document.getElementById('card-errors');
+                errorElement.textContent = error.message;
+                submitButton.disabled = false;
+                submitButton.textContent = 'Pay Now';
+            }
+        });
+
+    } catch (error) {
+        console.error('Payment initialization error:', error);
+        document.getElementById('payment-status').innerHTML = `
+            <div class="text-red-500">
+                <p>Failed to initialize payment: ${error.message}</p>
+                <a href="/cart/" class="text-blue-500 hover:underline">Return to cart</a>
+            </div>
+        `;
+    }
+}
+
+// Initialize payment when the page loads
+document.addEventListener('DOMContentLoaded', initializePayment);
+</script>
+{% endblock %} 

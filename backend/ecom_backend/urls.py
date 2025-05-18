@@ -18,6 +18,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
+from django.views.generic import TemplateView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -26,4 +27,13 @@ urlpatterns = [
     path('api/', include('products.urls')),
     path('api/', include('orders.urls')),
     path('api/', include('payments.urls')),
+    path('', TemplateView.as_view(template_name='products.html'), name='products'),
+    path('products/', TemplateView.as_view(template_name='products.html'), name='products'),
+    path('products/<int:pk>/', TemplateView.as_view(template_name='product_detail.html'), name='product-detail'),
+    path('cart/', TemplateView.as_view(template_name='cart.html'), name='cart'),
+    path('orders/', TemplateView.as_view(template_name='orders.html'), name='orders'),
+    path('payment/', TemplateView.as_view(template_name='payment.html'), name='payment'),
+    path('login/', TemplateView.as_view(template_name='login.html'), name='login'),
+    path('register/', TemplateView.as_view(template_name='register.html'), name='register'),
+    path('profile/', TemplateView.as_view(template_name='profile.html'), name='profile'),
 ]

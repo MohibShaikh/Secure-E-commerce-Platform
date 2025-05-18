@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+
+{% block title %}Shopping Cart - E-Commerce Platform{% endblock %}
+
+{% block content %}
+<div class="container mx-auto max-w-4xl py-8">
+    <h1 class="text-3xl font-bold mb-8">Shopping Cart</h1>
+    <div id="cart-items" class="bg-white shadow-lg rounded-lg p-6">
+        <!-- Cart items will be loaded here -->
+    </div>
+    <div class="mt-8 flex justify-between items-center">
+        <a href="/products/" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded">Continue Shopping</a>
+        <button onclick="checkout()" class="bg-gradient-to-r from-green-400 to-blue-500 hover:from-green-500 hover:to-blue-600 text-white font-bold py-2 px-6 rounded shadow-lg">Proceed to Checkout</button>
+    </div>
+</div>
+
+<!-- Add this popup container to the HTML, just after the main cart container -->
+<div id="cart-popup" class="fixed top-6 right-6 z-50 hidden bg-white border border-pink-200 shadow-lg rounded-lg px-6 py-4 flex items-center space-x-3 transition-all duration-300">
+  <svg class="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+  <span class="text-pink-700 font-semibold">Action successful!</span>
+</div>
+
+<script>
+async function loadCart() {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        window.location.href = '/login/';
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/cart/', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        if (!response.ok) {
+            throw new Error('Failed to load cart');
+        }
+        const cart = await response.json();
+        const cartObj = cart.results ? cart.results[0] : cart;
+        displayCart(cartObj);
+        if (typeof updateCartCount === 'function') updateCartCount();
+    } catch (error) {
+        document.getElementById('cart-items').innerHTML = '<p class="text-red-500">Failed to load cart. Please try again.</p>';
+    }
+}
+
+function displayCart(cart) {
+    const cartItems = document.getElementById('cart-items');
+    if (!cart.items || cart.items.length === 0) {
+        cartItems.innerHTML = '<p class="text-gray-500 text-center py-4">Your cart is empty</p>';
+        return;
+    }
+
+    const itemsHtml = cart.items.map(item => `
+        <div class="flex items-center justify-between py-4 border-b">
+            <div class="flex items-center">
+                <img src="${item.product.image || 'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=facearea&w=400&q=80'}" 
+                     alt="${item.product.name}" 
+                     class="w-20 h-20 object-cover rounded">
+                <div class="ml-4">
+                    <h3 class="font-semibold">${item.product.name}</h3>
+                    <p class="text-gray-600">$${item.product.price}</p>
+                </div>
+            </div>
+            <div class="flex items-center">
+                <button onclick="updateQuantity(${item.id}, ${item.quantity - 1})" 
+                        class="px-2 py-1 bg-gray-200 rounded-l">-</button>
+                <span class="px-4 py-1 bg-gray-100">${item.quantity}</span>
+                <button onclick="updateQuantity(${item.id}, ${item.quantity + 1})" 
+                        class="px-2 py-1 bg-gray-200 rounded-r">+</button>
+                <button onclick="removeItem(${item.id})" 
+                        class="ml-4 text-red-500 hover:text-red-700">Remove</button>
+            </div>
+        </div>
+    `).join('');
+
+    cartItems.innerHTML = `
+        ${itemsHtml}
+        <div class="mt-4 text-right">
+            <p class="text-xl font-bold">Total: $${cart.total_price}</p>
+        </div>
+    `;
+}
+
+function showCartPopup(message = 'Action successful!', isError = false) {
+    const popup = document.getElementById('cart-popup');
+    popup.querySelector('span').textContent = message;
+    popup.classList.remove('hidden');
+    popup.classList.toggle('border-pink-200', !isError);
+    popup.classList.toggle('border-red-300', isError);
+    popup.querySelector('svg').classList.toggle('text-pink-500', !isError);
+    popup.querySelector('svg').classList.toggle('text-red-500', isError);
+    setTimeout(() => {
+        popup.classList.add('hidden');
+    }, 1000);
+}
+
+async function updateQuantity(itemId, newQuantity) {
+    if (newQuantity < 1) return; // Prevent going below 1
+    const token = localStorage.getItem('access_token');
+    try {
+        const response = await fetch(`/api/cart/update_quantity/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                product_id: itemId,
+                quantity: newQuantity
+            })
+        });
+        if (!response.ok) {
+            showCartPopup('Failed to update quantity. Please try again.', true);
+            return;
+        }
+        showCartPopup('Quantity updated!');
+        loadCart();
+    } catch (error) {
+        showCartPopup('Failed to update quantity. Please try again.', true);
+    }
+}
+
+async function removeItem(itemId) {
+    const token = localStorage.getItem('access_token');
+    try {
+        const response = await fetch(`/api/cart/remove_item/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                product_id: itemId
+            })
+        });
+        if (!response.ok) {
+            showCartPopup('Failed to remove item. Please try again.', true);
+            return;
+        }
+        showCartPopup('Item removed from cart!');
+        loadCart();
+    } catch (error) {
+        showCartPopup('Failed to remove item. Please try again.', true);
+    }
+}
+
+async function refreshToken() {
+    const refresh_token = localStorage.getItem('refresh_token');
+    if (!refresh_token) {
+        window.location.href = '/login/';
+        return null;
+    }
+
+    try {
+        const response = await fetch('/api/token/refresh/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ refresh: refresh_token })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to refresh token');
+        }
+
+        const data = await response.json();
+        localStorage.setItem('access_token', data.access);
+        return data.access;
+    } catch (error) {
+        window.location.href = '/login/';
+        return null;
+    }
+}
+
+async function checkout() {
+    let token = localStorage.getItem('access_token');
+    if (!token) {
+        window.location.href = '/login/';
+        return;
+    }
+
+    try {
+        let response = await fetch('/api/cart/checkout/', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        // If token expired, try to refresh it
+        if (response.status === 401) {
+            token = await refreshToken();
+            if (!token) return;
+
+            response = await fetch('/api/cart/checkout/', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+        }
+        
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Checkout failed');
+        }
+
+        // Redirect to payment page with order ID
+        window.location.href = `/payment/?order_id=${data.order_id}`;
+    } catch (error) {
+        alert(error.message || 'Checkout failed. Please try again.');
+    }
+}
+
+loadCart();
+</script>
+{% endblock %} 

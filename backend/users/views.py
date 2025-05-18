@@ -18,6 +18,9 @@ def login_page(request):
 def profile_page(request):
     return render(request, 'profile.html')
 
+def edit_profile_page(request):
+    return render(request, 'edit_profile.html')
+
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     permission_classes = (AllowAny,)
@@ -32,10 +35,20 @@ class LoginView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data
         refresh = RefreshToken.for_user(user)
-        return Response({
+        response = Response({
             'refresh': str(refresh),
             'access': str(refresh.access_token),
         })
+        # Set access token as HttpOnly cookie
+        response.set_cookie(
+            key='access_token',
+            value=str(refresh.access_token),
+            httponly=True,
+            secure=False,  # Set to True in production
+            samesite='Lax',
+            max_age=60*15,  # 15 minutes
+        )
+        return response
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
     permission_classes = (IsAuthenticated,)

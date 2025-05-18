@@ -29,7 +29,7 @@
     <div id="error-message" class="alert alert-error" style="display: none;"></div>
 
     <div style="display: flex; gap: 1rem;">
-        <button onclick="window.location.href='/api/users/profile/edit'" class="btn btn-secondary">Edit Profile</button>
+        <button onclick="window.location.href='/api/users/profile/edit/'" class="btn btn-secondary">Edit Profile</button>
         <button onclick="logout()" class="btn btn-primary">Logout</button>
     </div>
 </div>
@@ -40,18 +40,23 @@ async function loadProfile() {
     const accessToken = localStorage.getItem('access_token');
     
     if (!accessToken) {
+        console.log('No access token found, redirecting to login');
         window.location.href = '/api/users/login/';
         return;
     }
 
     try {
-        const response = await fetch('/api/users/profile/', {
+        console.log('Fetching profile with token:', accessToken);
+        const response = await fetch('/api/users/api/profile/', {
             headers: {
                 'Authorization': `Bearer ${accessToken}`
             }
         });
 
+        console.log('Profile response status:', response.status);
+
         if (response.status === 401) {
+            console.log('Token expired, attempting refresh');
             // Token expired, try to refresh
             const refreshToken = localStorage.getItem('refresh_token');
             if (refreshToken) {
@@ -63,6 +68,8 @@ async function loadProfile() {
                     body: JSON.stringify({ refresh: refreshToken })
                 });
 
+                console.log('Refresh response status:', refreshResponse.status);
+
                 if (refreshResponse.ok) {
                     const data = await refreshResponse.json();
                     localStorage.setItem('access_token', data.access);
@@ -71,11 +78,13 @@ async function loadProfile() {
                 }
             }
             // If refresh failed, redirect to login
+            console.log('Refresh failed, redirecting to login');
             window.location.href = '/api/users/login/';
             return;
         }
 
         const data = await response.json();
+        console.log('Profile data:', data);
         
         // Update profile information
         document.getElementById('userName').textContent = data.username;
@@ -94,12 +103,14 @@ async function loadProfile() {
             profilePicture.textContent = initials;
         }
     } catch (error) {
+        console.error('Profile load error:', error);
         errorMessage.textContent = 'Failed to load profile. Please try again.';
         errorMessage.style.display = 'block';
     }
 }
 
 function logout() {
+    console.log('Logging out...');
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     window.location.href = '/api/users/login/';
