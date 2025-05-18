@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile - E-Commerce Platform{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="profile-header">
+        <div class="profile-picture" id="profilePicture">
+            <!-- Initials will be displayed here -->
+        </div>
+        <h1 id="userName">Loading...</h1>
+    </div>
+
+    <div class="profile-info">
+        <div class="profile-info-item">
+            <span class="profile-info-label">Email</span>
+            <span class="profile-info-value" id="userEmail">Loading...</span>
+        </div>
+        <div class="profile-info-item">
+            <span class="profile-info-label">Phone</span>
+            <span class="profile-info-value" id="userPhone">Loading...</span>
+        </div>
+        <div class="profile-info-item">
+            <span class="profile-info-label">Address</span>
+            <span class="profile-info-value" id="userAddress">Loading...</span>
+        </div>
+    </div>
+
+    <div id="error-message" class="alert alert-error" style="display: none;"></div>
+
+    <div style="display: flex; gap: 1rem;">
+        <button onclick="window.location.href='/api/users/profile/edit'" class="btn btn-secondary">Edit Profile</button>
+        <button onclick="logout()" class="btn btn-primary">Logout</button>
+    </div>
+</div>
+
+<script>
+async function loadProfile() {
+    const errorMessage = document.getElementById('error-message');
+    const accessToken = localStorage.getItem('access_token');
+    
+    if (!accessToken) {
+        window.location.href = '/api/users/login/';
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/users/profile/', {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
+
+        if (response.status === 401) {
+            // Token expired, try to refresh
+            const refreshToken = localStorage.getItem('refresh_token');
+            if (refreshToken) {
+                const refreshResponse = await fetch('/api/token/refresh/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ refresh: refreshToken })
+                });
+
+                if (refreshResponse.ok) {
+                    const data = await refreshResponse.json();
+                    localStorage.setItem('access_token', data.access);
+                    // Retry the profile request
+                    return loadProfile();
+                }
+            }
+            // If refresh failed, redirect to login
+            window.location.href = '/api/users/login/';
+            return;
+        }
+
+        const data = await response.json();
+        
+        // Update profile information
+        document.getElementById('userName').textContent = data.username;
+        document.getElementById('userEmail').textContent = data.email;
+        document.getElementById('userPhone').textContent = data.phone_number || 'Not provided';
+        document.getElementById('userAddress').textContent = data.address || 'Not provided';
+        
+        // Set profile picture or initials
+        const profilePicture = document.getElementById('profilePicture');
+        if (data.profile_picture) {
+            profilePicture.style.backgroundImage = `url(${data.profile_picture})`;
+            profilePicture.style.backgroundSize = 'cover';
+            profilePicture.style.backgroundPosition = 'center';
+        } else {
+            const initials = data.username.substring(0, 2).toUpperCase();
+            profilePicture.textContent = initials;
+        }
+    } catch (error) {
+        errorMessage.textContent = 'Failed to load profile. Please try again.';
+        errorMessage.style.display = 'block';
+    }
+}
+
+function logout() {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    window.location.href = '/api/users/login/';
+}
+
+// Load profile when page loads
+loadProfile();
+</script>
+{% endblock %} 

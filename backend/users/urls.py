@@ -1,9 +1,14 @@
 from django.urls import path
-from .views import RegisterView, LoginView, ProfileView, ProfilePictureUpdateView
+from . import views
 
 urlpatterns = [
-    path('register/', RegisterView.as_view(), name='register'),
-    path('login/', LoginView.as_view(), name='login'),
-    path('profile/', ProfileView.as_view(), name='profile'),
-    path('profile/picture/', ProfilePictureUpdateView.as_view(), name='profile-picture'),
+    # Template views
+    path('register/', views.register_page, name='register_page'),
+    path('login/', views.login_page, name='login_page'),
+    path('profile/', views.profile_page, name='profile_page'),
+    
+    # API views
+    path('register/', views.RegisterView.as_view(), name='register'),
+    path('login/', views.LoginView.as_view(), name='login'),
+    path('profile/', views.UserProfileView.as_view(), name='profile'),
 ] 

@@ -1,37 +1,52 @@
 from django.shortcuts import render
-from rest_framework import generics, permissions, status
+from django.contrib.auth import get_user_model
+from rest_framework import status, generics
 from rest_framework.response import Response
-from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import User
-from .serializers import UserRegisterSerializer, UserLoginSerializer, UserProfileSerializer
+from .serializers import UserSerializer, UserProfileSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 
-# Create your views here.
+User = get_user_model()
+
+def register_page(request):
+    return render(request, 'register.html')
+
+def login_page(request):
+    return render(request, 'login.html')
+
+def profile_page(request):
+    return render(request, 'profile.html')
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
-    serializer_class = UserRegisterSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = (AllowAny,)
+    serializer_class = UserSerializer
 
-class LoginView(APIView):
-    permission_classes = [permissions.AllowAny]
-    def post(self, request):
-        serializer = UserLoginSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data
-        refresh = RefreshToken.for_user(user)
-        response = Response({
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-        }, status=status.HTTP_200_OK)
-        # Set HttpOnly cookie
-        response.set_cookie('access_token', str(refresh.access_token), httponly=True, secure=True, samesite='Lax')
-        return response
+class LoginView(generics.CreateAPIView):
+    permission_classes = (AllowAny,)
+    serializer_class = UserSerializer
 
-class ProfileView(generics.RetrieveUpdateAPIView):
+    def post(self, request, *args, **kwargs):
+        username = request.data.get('username')
+        password = request.data.get('password')
+
+        try:
+            user = User.objects.get(username=username)
+            if user.check_password(password):
+                refresh = RefreshToken.for_user(user)
+                return Response({
+                    'refresh': str(refresh),
+                    'access': str(refresh.access_token),
+                })
+            return Response({'detail': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+        except User.DoesNotExist:
+            return Response({'detail': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+class UserProfileView(generics.RetrieveUpdateAPIView):
+    permission_classes = (IsAuthenticated,)
     serializer_class = UserProfileSerializer
-    permission_classes = [permissions.IsAuthenticated]
+
     def get_object(self):
         return self.request.user
 
