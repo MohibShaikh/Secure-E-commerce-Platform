@@ -52,4 +52,4 @@ env/
 node_modules/
 
 # Optionally ignore built Tailwind CSS (uncomment if you don't want to commit it)
-backend/static/css/styles.css 
+# backend/static/css/styles.css 
