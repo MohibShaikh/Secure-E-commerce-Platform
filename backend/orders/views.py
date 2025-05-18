@@ -12,6 +12,7 @@ from .serializers import OrderSerializer, OrderItemSerializer
 class CartViewSet(viewsets.ModelViewSet):
     serializer_class = CartSerializer
     permission_classes = [permissions.IsAuthenticated]
+    queryset = Cart.objects.all()
 
     def get_queryset(self):
         return Cart.objects.filter(user=self.request.user)
@@ -25,6 +26,7 @@ class CartViewSet(viewsets.ModelViewSet):
 class CartItemViewSet(viewsets.ModelViewSet):
     serializer_class = CartItemSerializer
     permission_classes = [permissions.IsAuthenticated]
+    queryset = CartItem.objects.all()
 
     def get_queryset(self):
         return CartItem.objects.filter(cart__user=self.request.user)
@@ -32,6 +34,7 @@ class CartItemViewSet(viewsets.ModelViewSet):
 class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
+    queryset = Order.objects.all()
 
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user)
@@ -39,6 +42,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 class OrderItemViewSet(viewsets.ModelViewSet):
     serializer_class = OrderItemSerializer
     permission_classes = [permissions.IsAuthenticated]
+    queryset = OrderItem.objects.all()
 
     def get_queryset(self):
         return OrderItem.objects.filter(order__user=self.request.user)
