@@ -19,7 +19,6 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
 from django.views.generic import TemplateView
-from . import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -28,7 +27,6 @@ urlpatterns = [
     path('api/', include('products.urls')),
     path('api/', include('orders.urls')),
     path('api/', include('payments.urls')),
-    path('waf/monitor/', views.waf_monitor, name='waf_monitor'),
     path('', TemplateView.as_view(template_name='products.html'), name='products'),
     path('products/', TemplateView.as_view(template_name='products.html'), name='products'),
     path('products/<int:pk>/', TemplateView.as_view(template_name='product_detail.html'), name='product-detail'),

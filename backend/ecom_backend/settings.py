@@ -52,7 +52,7 @@ INSTALLED_APPS = [
     'django_filters',
     'drf_yasg',
     'django_cleanup.apps.CleanupConfig',
-    'aiwaf',  # AI-powered Web Application Firewall
+    'django_waf',  # Web Application Firewall
     
     # Local apps
     'users.apps.UsersConfig',
@@ -62,11 +62,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "aiwaf.middleware.IPAndKeywordBlockMiddleware",
-    "aiwaf.middleware.RateLimitMiddleware",
-    "aiwaf.middleware.AIAnomalyMiddleware",
-    "aiwaf.middleware.HoneypotMiddleware",
-    "aiwaf.middleware.UUIDTamperMiddleware",
+    "django_waf.middleware.WafMiddleware",  # WAF middleware (must be first)
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -213,6 +209,12 @@ if not DEBUG:
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
 STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', '')
 
+# WAF Settings
+WAF_ENABLED = True
+WAF_BLOCK_ATTACKS = True
+WAF_LOG_ATTACKS = True
+WAF_LOG_FILE = os.path.join(BASE_DIR, 'logs', 'waf.log')
+
 # Rate Limiting Settings
 RATELIMIT_ENABLE = True
 RATELIMIT_USE_CACHE = 'default'
@@ -220,23 +222,16 @@ RATELIMIT_KEY_PREFIX = 'ratelimit'
 
 # Rate limit groups
 RATELIMIT_GROUPS = {
-    'default': {
-        'RATE': '100/h',  # 100 requests per hour
-        'BLOCK_TIME': 300,  # 5 minutes block
-    },
-    'auth': {
-        'RATE': '5/5m',  # 5 requests per 5 minutes
-        'BLOCK_TIME': 900,  # 15 minutes block
-    },
-    'api': {
-        'RATE': '1000/h',  # 1000 requests per hour
-        'BLOCK_TIME': 1800,  # 30 minutes block
-    },
-    'checkout': {
-        'RATE': '10/m',  # 10 requests per minute
-        'BLOCK_TIME': 600,  # 10 minutes block
-    }
+    'default': '100/h',  # 100 requests per hour
+    'auth': '5/5m',      # 5 requests per 5 minutes
+    'api': '1000/h',     # 1000 requests per hour
+    'checkout': '10/m',  # 10 requests per minute
 }
+
+# Rate limit exempt IPs
+RATELIMIT_EXEMPT_IPS = [
+    '127.0.0.1',  # Localhost
+]
 
 # Rate limit exempt paths
 RATELIMIT_EXEMPT_PATHS = [
@@ -245,32 +240,79 @@ RATELIMIT_EXEMPT_PATHS = [
     '/metrics/',
 ]
 
-# Rate limit exempt IPs
-RATELIMIT_EXEMPT_IPS = [
-    '127.0.0.1',  # Localhost
-]
-
-# Rate limit response settings
-RATELIMIT_RESPONSE = {
-    'status_code': 429,  # Too Many Requests
-    'message': 'Too many requests. Please try again later.',
+# Rate limit block duration (in seconds)
+RATELIMIT_BLOCK_DURATION = {
+    'default': 300,   # 5 minutes
+    'auth': 900,      # 15 minutes
+    'api': 1800,      # 30 minutes
+    'checkout': 600,  # 10 minutes
 }
 
-# AI-WAF Settings
-AIWAF_ACCESS_LOG = os.path.join(BASE_DIR, 'logs', 'access.log')
-AIWAF_MODEL_PATH = os.path.join(BASE_DIR, 'aiwaf', 'resources', 'model.pkl')
-AIWAF_HONEYPOT_FIELD = "hp_field"
-AIWAF_RATE_WINDOW = 10  # seconds
-AIWAF_RATE_MAX = 20     # max requests per window
-AIWAF_RATE_FLOOD = 10   # flood threshold
-AIWAF_WINDOW_SECONDS = 60  # anomaly detection window
-AIWAF_FILE_EXTENSIONS = [".php", ".asp", ".jsp", ".exe", ".dll", ".bat", ".sh"]
-AIWAF_EXEMPT_PATHS = [
-    "/admin/",
-    "/static/",
-    "/media/",
-    "/health/",
-    "/metrics/",
-    "/api/docs/",
-    "/api/schema/",
-]
+# WAF Rules
+WAF_RULES = {
+    'sql_injection': {
+        'enabled': True,
+        'patterns': [
+            r'(?i)(\bUNION\b.*\bSELECT\b)',
+            r'(?i)(\bOR\b.*\b1\b.*\b=\b.*\b1\b)',
+            r'(?i)(\bDROP\b.*\bTABLE\b)',
+            r'(?i)(\bDELETE\b.*\bFROM\b)',
+            r'(?i)(\bINSERT\b.*\bINTO\b)',
+            r'(?i)(\bUPDATE\b.*\bSET\b)',
+        ]
+    },
+    'xss': {
+        'enabled': True,
+        'patterns': [
+            r'<script.*?>',
+            r'javascript:',
+            r'onerror=',
+            r'onload=',
+            r'eval\(',
+            r'document\.cookie',
+        ]
+    },
+    'path_traversal': {
+        'enabled': True,
+        'patterns': [
+            r'\.\./',
+            r'\.\.\\',
+            r'%2e%2e%2f',
+            r'%252e%252e%252f',
+        ]
+    },
+    'command_injection': {
+        'enabled': True,
+        'patterns': [
+            r'(\bcat\b|\bchmod\b|\bcurl\b|\bwget\b|\bnet\b|\bipconfig\b|\bifconfig\b)',
+            r'(\|\s*\bcat\b|\|\s*\bchmod\b|\|\s*\bcurl\b|\|\s*\bwget\b)',
+            r'(\&\s*\bcat\b|\&\s*\bchmod\b|\&\s*\bcurl\b|\&\s*\bwget\b)',
+        ]
+    },
+    'file_inclusion': {
+        'enabled': True,
+        'patterns': [
+            r'include\s*\([^)]*\$',
+            r'require\s*\([^)]*\$',
+            r'include_once\s*\([^)]*\$',
+            r'require_once\s*\([^)]*\$',
+        ]
+    },
+    'rate_limit': {
+        'enabled': True,
+        'patterns': [
+            r'^/api/auth/',  # Auth endpoints
+            r'^/api/checkout/',  # Checkout endpoints
+            r'^/api/',  # All API endpoints
+            r'^/$',  # Root endpoint
+        ]
+    }
+}
+
+# WAF Response Settings
+WAF_RESPONSE = {
+    'block_status_code': 403,
+    'block_message': 'Access Denied - Security Violation Detected',
+    'rate_limit_message': 'Too Many Requests - Please try again later',
+    'log_format': '{timestamp} {ip} {method} {path} {rule_type} {pattern} {rate_limit_info}',
+}
