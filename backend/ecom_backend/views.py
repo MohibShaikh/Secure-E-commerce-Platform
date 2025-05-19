@@ -1,7 +1,7 @@
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.contrib.admin.views.decorators import staff_member_required
-from aiwaf.models import BlockedIP, DynamicKeyword
+from aiwaf.models import BlacklistEntry, DynamicKeyword, FeatureSample
 from django.db.models import Count
 from datetime import datetime, timedelta
 
@@ -11,38 +11,36 @@ def waf_monitor(request):
     # Get last 24 hours of data
     last_24h = datetime.now() - timedelta(hours=24)
     
-    # Get blocked IPs
-    blocked_ips = BlockedIP.objects.filter(
+    # Get blacklisted IPs
+    blacklisted_ips = BlacklistEntry.objects.filter(
         created_at__gte=last_24h
-    ).values('ip_address').annotate(
+    ).values('ip_address', 'reason').annotate(
         count=Count('id')
     ).order_by('-count')[:10]
     
     # Get top attack patterns
     attack_patterns = DynamicKeyword.objects.filter(
-        created_at__gte=last_24h
-    ).values('keyword').annotate(
-        count=Count('id')
-    ).order_by('-count')[:10]
+        last_updated__gte=last_24h
+    ).values('keyword', 'count').order_by('-count')[:10]
+    
+    # Get anomaly stats
+    anomalies = FeatureSample.objects.filter(
+        created_at__gte=last_24h,
+        label='anomaly'
+    ).count()
     
     # Get rate limit stats
-    rate_limits = BlockedIP.objects.filter(
+    rate_limits = BlacklistEntry.objects.filter(
         created_at__gte=last_24h,
         reason__startswith='rate_limit'
     ).count()
     
-    # Get anomaly stats
-    anomalies = BlockedIP.objects.filter(
-        created_at__gte=last_24h,
-        reason__startswith='anomaly'
-    ).count()
-    
     return JsonResponse({
         'last_24h_stats': {
-            'total_blocks': BlockedIP.objects.filter(created_at__gte=last_24h).count(),
+            'total_blocks': BlacklistEntry.objects.filter(created_at__gte=last_24h).count(),
             'rate_limit_blocks': rate_limits,
             'anomaly_blocks': anomalies,
-            'top_blocked_ips': list(blocked_ips),
+            'top_blocked_ips': list(blacklisted_ips),
             'top_attack_patterns': list(attack_patterns),
         },
         'waf_status': {
