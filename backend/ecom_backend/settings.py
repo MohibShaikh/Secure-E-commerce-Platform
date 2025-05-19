@@ -52,7 +52,6 @@ INSTALLED_APPS = [
     'django_filters',
     'drf_yasg',
     'django_cleanup.apps.CleanupConfig',
-    'django_waf',  # Web Application Firewall
     
     # Local apps
     'users.apps.UsersConfig',
@@ -62,7 +61,6 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "django_waf.middleware.WafMiddleware",  # WAF middleware (must be first)
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -209,12 +207,6 @@ if not DEBUG:
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
 STRIPE_PUBLISHABLE_KEY = os.getenv('STRIPE_PUBLISHABLE_KEY', '')
 
-# WAF Settings
-WAF_ENABLED = True
-WAF_BLOCK_ATTACKS = True
-WAF_LOG_ATTACKS = True
-WAF_LOG_FILE = os.path.join(BASE_DIR, 'logs', 'waf.log')
-
 # Rate Limiting Settings
 RATELIMIT_ENABLE = True
 RATELIMIT_USE_CACHE = 'default'
@@ -246,73 +238,4 @@ RATELIMIT_BLOCK_DURATION = {
     'auth': 900,      # 15 minutes
     'api': 1800,      # 30 minutes
     'checkout': 600,  # 10 minutes
-}
-
-# WAF Rules
-WAF_RULES = {
-    'sql_injection': {
-        'enabled': True,
-        'patterns': [
-            r'(?i)(\bUNION\b.*\bSELECT\b)',
-            r'(?i)(\bOR\b.*\b1\b.*\b=\b.*\b1\b)',
-            r'(?i)(\bDROP\b.*\bTABLE\b)',
-            r'(?i)(\bDELETE\b.*\bFROM\b)',
-            r'(?i)(\bINSERT\b.*\bINTO\b)',
-            r'(?i)(\bUPDATE\b.*\bSET\b)',
-        ]
-    },
-    'xss': {
-        'enabled': True,
-        'patterns': [
-            r'<script.*?>',
-            r'javascript:',
-            r'onerror=',
-            r'onload=',
-            r'eval\(',
-            r'document\.cookie',
-        ]
-    },
-    'path_traversal': {
-        'enabled': True,
-        'patterns': [
-            r'\.\./',
-            r'\.\.\\',
-            r'%2e%2e%2f',
-            r'%252e%252e%252f',
-        ]
-    },
-    'command_injection': {
-        'enabled': True,
-        'patterns': [
-            r'(\bcat\b|\bchmod\b|\bcurl\b|\bwget\b|\bnet\b|\bipconfig\b|\bifconfig\b)',
-            r'(\|\s*\bcat\b|\|\s*\bchmod\b|\|\s*\bcurl\b|\|\s*\bwget\b)',
-            r'(\&\s*\bcat\b|\&\s*\bchmod\b|\&\s*\bcurl\b|\&\s*\bwget\b)',
-        ]
-    },
-    'file_inclusion': {
-        'enabled': True,
-        'patterns': [
-            r'include\s*\([^)]*\$',
-            r'require\s*\([^)]*\$',
-            r'include_once\s*\([^)]*\$',
-            r'require_once\s*\([^)]*\$',
-        ]
-    },
-    'rate_limit': {
-        'enabled': True,
-        'patterns': [
-            r'^/api/auth/',  # Auth endpoints
-            r'^/api/checkout/',  # Checkout endpoints
-            r'^/api/',  # All API endpoints
-            r'^/$',  # Root endpoint
-        ]
-    }
-}
-
-# WAF Response Settings
-WAF_RESPONSE = {
-    'block_status_code': 403,
-    'block_message': 'Access Denied - Security Violation Detected',
-    'rate_limit_message': 'Too Many Requests - Please try again later',
-    'log_format': '{timestamp} {ip} {method} {path} {rule_type} {pattern} {rate_limit_info}',
 }

@@ -3,6 +3,7 @@ from django_ratelimit.decorators import ratelimit
 from django_ratelimit.exceptions import Ratelimited
 from rest_framework.response import Response
 from rest_framework import status
+from django.conf import settings
 
 def rate_limit(group='default', key='ip', method=['POST', 'PUT', 'DELETE']):
     """
@@ -20,7 +21,7 @@ def rate_limit(group='default', key='ip', method=['POST', 'PUT', 'DELETE']):
                 group=group,
                 key=key,
                 method=method,
-                rate=RATELIMIT_GROUPS[group],
+                rate=settings.RATELIMIT_GROUPS[group],
                 block=True
             )
             def _wrapped_view(request, *args, **kwargs):
